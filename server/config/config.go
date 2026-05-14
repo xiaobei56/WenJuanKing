@@ -1,11 +1,14 @@
 package config
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
+	"time"
 
 	_ "github.com/lib/pq"
+	"github.com/redis/go-redis/v9"
 	"gopkg.in/yaml.v3"
 )
 
@@ -44,6 +47,7 @@ type JWTConfig struct {
 
 var cfg *Config
 var db *sql.DB
+var rdb *redis.Client
 
 func Load() error {
 	cfg = &Config{}
@@ -94,8 +98,36 @@ func InitDB() error {
 
 	db.SetMaxOpenConns(25)
 	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
 
 	return nil
+}
+
+func InitRedis() error {
+	if cfg == nil {
+		if err := Load(); err != nil {
+			return err
+		}
+	}
+
+	rdb = redis.NewClient(&redis.Options{
+		Addr:     fmt.Sprintf("%s:%d", cfg.Redis.Host, cfg.Redis.Port),
+		Password: cfg.Redis.Password,
+		DB:       cfg.Redis.DB,
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		return fmt.Errorf("failed to connect to Redis: %w", err)
+	}
+
+	return nil
+}
+
+func GetRedis() *redis.Client {
+	return rdb
 }
 
 func CloseDB() {
@@ -104,6 +136,37 @@ func CloseDB() {
 	}
 }
 
+func CloseRedis() {
+	if rdb != nil {
+		rdb.Close()
+	}
+}
+
 func GetRedisConfig() RedisConfig {
 	return cfg.Redis
+}
+
+type CacheService struct {
+	client *redis.Client
+}
+
+func NewCacheService() *CacheService {
+	return &CacheService{client: rdb}
+}
+
+func (c *CacheService) Get(ctx context.Context, key string) (string, error) {
+	return c.client.Get(ctx, key).Result()
+}
+
+func (c *CacheService) Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error {
+	return c.client.Set(ctx, key, value, expiration).Err()
+}
+
+func (c *CacheService) Delete(ctx context.Context, key string) error {
+	return c.client.Del(ctx, key).Err()
+}
+
+func (c *CacheService) Exists(ctx context.Context, key string) (bool, error) {
+	result, err := c.client.Exists(ctx, key).Result()
+	return result > 0, err
 }

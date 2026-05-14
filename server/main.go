@@ -21,6 +21,12 @@ func main() {
 	}
 	defer config.CloseDB()
 
+	if err := config.InitRedis(); err != nil {
+		log.Printf("Warning: Failed to init Redis: %v (continuing without cache)", err)
+	} else {
+		defer config.CloseRedis()
+	}
+
 	r := gin.Default()
 	r.Use(middleware.CORS())
 	r.Use(middleware.Logger())
