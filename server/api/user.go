@@ -221,3 +221,42 @@ func (h *UserHandler) ChangePassword(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Password changed"})
 }
+
+func (h *UserHandler) UpdateStatus(c *gin.Context) {
+	id := c.Param("id")
+	var req struct {
+		Status int `json:"status" binding:"required"` // 1=active, 0=frozen
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid request: %v", err)})
+		return
+	}
+
+	if req.Status != 0 && req.Status != 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Status must be 0 (frozen) or 1 (active)"})
+		return
+	}
+
+	if err := h.service.UpdateStatus(id, req.Status); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to update status: %v", err)})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "User status updated"})
+}
+
+func (h *UserHandler) UpdateRole(c *gin.Context) {
+	id := c.Param("id")
+	var req struct {
+		Role string `json:"role" binding:"required"` // "user" or "admin"
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid request: %v", err)})
+		return
+	}
+
+	if err := h.service.UpdateRole(id, req.Role); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to update role: %v", err)})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "User role updated"})
+}

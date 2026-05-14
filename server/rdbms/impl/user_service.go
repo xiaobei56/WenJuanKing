@@ -51,9 +51,9 @@ func (s *UserService) Create(username, password, email, phone, nickname string) 
 func (s *UserService) GetByID(id string) (*model.User, error) {
 	user := &model.User{}
 	err := s.db.QueryRow(
-		`SELECT id, username, email, phone, nickname, avatar, status, create_time, update_time, last_login_time
+		`SELECT id, username, email, phone, nickname, avatar, role, status, create_time, update_time, last_login_time
 		FROM users WHERE id = $1`, id,
-	).Scan(&user.ID, &user.Username, &user.Email, &user.Phone, &user.Nickname, &user.Avatar, &user.Status, &user.CreateTime, &user.UpdateTime, &user.LastLoginTime)
+	).Scan(&user.ID, &user.Username, &user.Email, &user.Phone, &user.Nickname, &user.Avatar, &user.Role, &user.Status, &user.CreateTime, &user.UpdateTime, &user.LastLoginTime)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("user not found")
@@ -66,9 +66,9 @@ func (s *UserService) GetByID(id string) (*model.User, error) {
 func (s *UserService) GetByUsername(username string) (*model.User, error) {
 	user := &model.User{}
 	err := s.db.QueryRow(
-		`SELECT id, username, password, email, phone, nickname, avatar, status, create_time, update_time, last_login_time
+		`SELECT id, username, password, email, phone, nickname, avatar, role, status, create_time, update_time, last_login_time
 		FROM users WHERE username = $1`, username,
-	).Scan(&user.ID, &user.Username, &user.Password, &user.Email, &user.Phone, &user.Nickname, &user.Avatar, &user.Status, &user.CreateTime, &user.UpdateTime, &user.LastLoginTime)
+	).Scan(&user.ID, &user.Username, &user.Password, &user.Email, &user.Phone, &user.Nickname, &user.Avatar, &user.Role, &user.Status, &user.CreateTime, &user.UpdateTime, &user.LastLoginTime)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("user not found")
@@ -94,7 +94,7 @@ func (s *UserService) List(page, size int) ([]*model.User, int64, error) {
 	}
 
 	rows, err := s.db.Query(
-		`SELECT id, username, email, phone, nickname, avatar, status, create_time, update_time, last_login_time
+		`SELECT id, username, email, phone, nickname, avatar, role, status, create_time, update_time, last_login_time
 		FROM users ORDER BY create_time DESC LIMIT $1 OFFSET $2`, size, offset,
 	)
 	if err != nil {
@@ -105,7 +105,7 @@ func (s *UserService) List(page, size int) ([]*model.User, int64, error) {
 	var users []*model.User
 	for rows.Next() {
 		user := &model.User{}
-		err := rows.Scan(&user.ID, &user.Username, &user.Email, &user.Phone, &user.Nickname, &user.Avatar, &user.Status, &user.CreateTime, &user.UpdateTime, &user.LastLoginTime)
+		err := rows.Scan(&user.ID, &user.Username, &user.Email, &user.Phone, &user.Nickname, &user.Avatar, &user.Role, &user.Status, &user.CreateTime, &user.UpdateTime, &user.LastLoginTime)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to scan user: %w", err)
 		}
@@ -194,6 +194,33 @@ func (s *UserService) ChangePassword(id, oldPassword, newPassword string) error 
 	_, err = s.db.Exec(`UPDATE users SET password = $1, update_time = $2 WHERE id = $3`, hash, time.Now(), id)
 	if err != nil {
 		return fmt.Errorf("failed to update password: %w", err)
+	}
+	return nil
+}
+
+func (s *UserService) UpdateStatus(id string, status int) error {
+	result, err := s.db.Exec(`UPDATE users SET status = $1, update_time = $2 WHERE id = $3`, status, time.Now(), id)
+	if err != nil {
+		return fmt.Errorf("failed to update status: %w", err)
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("user not found")
+	}
+	return nil
+}
+
+func (s *UserService) UpdateRole(id, role string) error {
+	if role != "user" && role != "admin" {
+		return fmt.Errorf("invalid role: must be 'user' or 'admin'")
+	}
+	result, err := s.db.Exec(`UPDATE users SET role = $1, update_time = $2 WHERE id = $3`, role, time.Now(), id)
+	if err != nil {
+		return fmt.Errorf("failed to update role: %w", err)
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("user not found")
 	}
 	return nil
 }

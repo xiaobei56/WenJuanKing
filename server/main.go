@@ -72,6 +72,8 @@ func main() {
 			users.GET("/profile", userHandler.GetProfile)
 			users.PUT("/profile", userHandler.UpdateProfile)
 			users.POST("/change-password", userHandler.ChangePassword)
+			users.PUT("/:id/status", userHandler.UpdateStatus)
+			users.PUT("/:id/role", userHandler.UpdateRole)
 		}
 
 		// Projects
