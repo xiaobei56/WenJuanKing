@@ -6,8 +6,8 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/surveyking/surveyking/server/rdbms/impl"
-	"github.com/surveyking/surveyking/server/shared/core/middleware"
+	"github.com/xiaobei56/WenJuanKing/server/rdbms/impl"
+	"github.com/xiaobei56/WenJuanKing/server/shared/core/middleware"
 )
 
 type RepoHandler struct {

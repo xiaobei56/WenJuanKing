@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/surveyking/surveyking/server/shared/core/utils"
+	"github.com/xiaobei56/WenJuanKing/server/shared/core/utils"
 )
 
 type NotificationService struct {

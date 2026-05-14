@@ -4,10 +4,10 @@ import (
 	"log"
 	"os"
 
-	"github.com/surveyking/surveyking/server/api"
-	"github.com/surveyking/surveyking/server/config"
-	"github.com/surveyking/surveyking/server/rdbms/impl"
-	"github.com/surveyking/surveyking/server/shared/core/middleware"
+	"github.com/xiaobei56/WenJuanKing/server/api"
+	"github.com/xiaobei56/WenJuanKing/server/config"
+	"github.com/xiaobei56/WenJuanKing/server/rdbms/impl"
+	"github.com/xiaobei56/WenJuanKing/server/shared/core/middleware"
 	"github.com/gin-gonic/gin"
 )
 

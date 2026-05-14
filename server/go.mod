@@ -1,4 +1,4 @@
-module github.com/surveyking/surveyking
+module github.com/xiaobei56/WenJuanKing
 
 go 1.21
 
