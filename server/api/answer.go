@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/csv"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -93,6 +94,45 @@ func (h *AnswerHandler) Statistics(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, stats)
+}
+
+func (h *AnswerHandler) Export(c *gin.Context) {
+	projectID := c.Param("projectId")
+	format := c.DefaultQuery("format", "csv")
+
+	answers, _, err := h.service.ListByProjectID(projectID, 1, 10000)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to get answers: %v", err)})
+		return
+	}
+
+	if format == "csv" {
+		c.Header("Content-Type", "text/csv")
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=answers_%s.csv", projectID))
+
+		writer := csv.NewWriter(c.Writer)
+		defer writer.Flush()
+
+		writer.Write([]string{"ID", "UserID", "Score", "TimeSpent", "Status", "IP", "UserAgent", "CreateTime", "Answers"})
+
+		for _, a := range answers {
+			record := []string{
+				a.ID,
+				a.UserID,
+				strconv.Itoa(a.Score),
+				strconv.Itoa(a.TimeSpent),
+				strconv.Itoa(a.Status),
+				a.IP,
+				a.UserAgent,
+				a.CreateTime.Format("2006-01-02 15:04:05"),
+				a.Answers,
+			}
+			writer.Write(record)
+		}
+		return
+	}
+
+	c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported format. Use 'csv'."})
 }
 
 func (h *AnswerHandler) UpdateScore(c *gin.Context) {
