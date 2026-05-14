@@ -8,12 +8,24 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+type Role string
+
+const (
+	RoleAdmin Role = "admin"
+	RoleUser  Role = "user"
+	RoleGuest Role = "guest"
+)
+
 type JWTMiddleware struct {
 	secret string
 }
 
 func NewJWTMiddleware(secret string) *JWTMiddleware {
 	return &JWTMiddleware{secret: secret}
+}
+
+func (m *JWTMiddleware) Authorize() gin.HandlerFunc {
+	return m.AuthRequired()
 }
 
 func (m *JWTMiddleware) AuthRequired() gin.HandlerFunc {
@@ -52,8 +64,45 @@ func (m *JWTMiddleware) AuthRequired() gin.HandlerFunc {
 
 		c.Set("userId", claims["userId"])
 		c.Set("username", claims["username"])
+		c.Set("role", claims["role"])
 		c.Next()
 	}
+}
+
+func RequireRole(roles ...Role) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userRole, exists := c.Get("role")
+		if !exists {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied: role not found"})
+			c.Abort()
+			return
+		}
+
+		userRoleStr, ok := userRole.(string)
+		if !ok {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied: invalid role"})
+			c.Abort()
+			return
+		}
+
+		for _, role := range roles {
+			if Role(userRoleStr) == role {
+				c.Next()
+				return
+			}
+		}
+
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied: insufficient permissions"})
+		c.Abort()
+	}
+}
+
+func RequireAdmin() gin.HandlerFunc {
+	return RequireRole(RoleAdmin)
+}
+
+func RequireUser() gin.HandlerFunc {
+	return RequireRole(RoleAdmin, RoleUser)
 }
 
 func CORS() gin.HandlerFunc {
