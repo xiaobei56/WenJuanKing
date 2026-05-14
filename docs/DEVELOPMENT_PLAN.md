@@ -12,51 +12,57 @@
 
 ## Development Phases
 
-### Phase 1: Foundation (Week 1-2)
+### Phase 1: Foundation (Week 1-2) ✅
 - [x] Project initialization
 - [x] Database schema design
 - [x] User authentication (JWT)
 - [x] Project CRUD API
-- [ ] Question CRUD API
-- [ ] Answer submission API
-- [ ] Repo (template) API
+- [x] Question CRUD API
+- [x] Answer submission API
+- [x] Repo (template) API
 
-### Phase 2: Core Features (Week 3-4)
-- [ ] User management
-- [ ] Project management with settings
-- [ ] Question types (12+ question types)
-- [ ] Answer collection and validation
+### Phase 2: Core Features (Week 3-4) ✅
+- [x] User management (CRUD + freeze + role)
+- [x] Project management with settings
+- [x] Question types (31 types)
+- [x] Answer collection and validation
 
-### Phase 3: Advanced Features (Week 5-8)
-- [ ] Question logic/branching
-- [ ] Answer statistics and reporting
-- [ ] File upload handling
-- [ ] Template repository
+### Phase 3: Advanced Features (Week 5-8) ✅
+- [x] Question logic/branching (跳题逻辑)
+- [x] Answer statistics and reporting
+- [x] File upload handling
+- [x] Template repository
+- [x] Auto-score for exams
 
-### Phase 4: Frontend (Week 9-12)
-- [ ] React project setup
-- [ ] Authentication pages
-- [ ] Project management UI
-- [ ] Survey builder
-- [ ] Answer collection UI
+### Phase 4: Frontend (Week 9-12) ✅
+- [x] React project setup
+- [x] Authentication pages
+- [x] Project management UI
+- [x] Survey builder
+- [x] Answer collection UI
+- [x] 31 question type components
+- [x] Statistics charts (echarts)
 
-### Phase 5: Polish (Week 13-16)
-- [ ] Responsive design
-- [ ] State management (Redux/Context)
-- [ ] API integration
-- [ ] Error handling
+### Phase 5: Polish (Week 13-16) ✅
+- [x] Responsive design
+- [x] State management (Zustand)
+- [x] API integration
+- [x] Error handling
+- [x] RBAC permission control
+- [x] CSV export
+- [x] Theme system (8 colors + dark mode)
 
-### Phase 6: Testing (Week 17-20)
-- [ ] Unit tests
-- [ ] Integration tests
-- [ ] E2E tests
+### Phase 6: Testing (Week 17-20) 🔄
+- [x] Unit tests
+- [x] Integration tests
+- [ ] E2E tests (Playwright) - pending
 
-### Phase 7: Deployment (Week 21-24)
-- [ ] Docker configuration
-- [ ] CI/CD pipeline
+### Phase 7: Deployment (Week 21-24) 🔄
+- [x] Docker configuration
+- [x] CI/CD pipeline (GitHub Actions)
 - [ ] Production deployment
 
-### Phase 8: Launch (Week 25-32)
+### Phase 8: Launch (Week 25-32) ⏳
 - [ ] Beta testing
 - [ ] Performance optimization
 - [ ] Documentation
@@ -99,10 +105,95 @@
 34. PageBreak
 
 ## Project Types (7 types)
-1. Survey
-2. Exam
-3. Vote
-4. Questionnaire
-5. Assessment
-6. Feedback
-7. Poll
+1. Survey (问卷)
+2. Exam (考试)
+3. Vote (投票)
+4. Questionnaire (测评)
+5. Assessment (评估)
+6. Feedback (反馈)
+7. Poll (投票)
+
+## API Endpoints Summary
+
+### Auth
+- POST /api/auth/register
+- POST /api/auth/login
+
+### Users
+- GET /api/v1/users
+- GET /api/v1/users/:id
+- PUT /api/v1/users/:id
+- DELETE /api/v1/users/:id
+- PUT /api/v1/users/:id/status (freeze/unfreeze)
+- PUT /api/v1/users/:id/role (update role)
+- GET /api/v1/users/profile
+- PUT /api/v1/users/profile
+- POST /api/v1/users/change-password
+
+### Projects
+- POST /api/v1/projects
+- GET /api/v1/projects
+- GET /api/v1/projects/:id
+- PUT /api/v1/projects/:id
+- DELETE /api/v1/projects/:id
+- POST /api/v1/projects/:id/publish
+- POST /api/v1/projects/:id/unpublish
+- POST /api/v1/projects/:id/duplicate
+
+### Questions
+- POST /api/v1/projects/:projectId/questions
+- GET /api/v1/projects/:projectId/questions
+- GET /api/v1/projects/:projectId/questions/:id
+- PUT /api/v1/projects/:projectId/questions/:id
+- DELETE /api/v1/projects/:projectId/questions/:id
+- POST /api/v1/projects/:projectId/questions/sort
+- POST /api/v1/projects/:projectId/questions/batch
+
+### Answers
+- POST /api/v1/projects/:projectId/answers
+- GET /api/v1/projects/:projectId/answers
+- GET /api/v1/projects/:projectId/answers/:id
+- GET /api/v1/projects/:projectId/answers/:id/statistics
+- POST /api/v1/projects/:projectId/answers/:id/score
+- POST /api/v1/projects/:projectId/answers/:id/auto-score
+- GET /api/v1/answers (my answers)
+
+### Files
+- POST /api/v1/files/upload
+- GET /api/v1/files
+- DELETE /api/v1/files/:id
+
+### Repos (Templates)
+- POST /api/v1/repos
+- GET /api/v1/repos
+- GET /api/v1/repos/public
+- GET /api/v1/repos/:id
+- PUT /api/v1/repos/:id
+- DELETE /api/v1/repos/:id
+
+## Recent Commits
+
+| Commit | Description |
+|--------|-------------|
+| c038140 | ci: add GitHub Actions CI/CD pipeline |
+| 1f8a647 | test: add service layer tests for answer and user |
+| ef31eca | feat(answer): add auto-score functionality for exams |
+| 30054b3 | feat(file): implement real file service with database |
+| 0a0ebed | feat(user): add role field + freeze/role API |
+| 8275db9 | feat(db): add role column to users table |
+| 4578c60 | fix: resolve Go build errors and module path |
+
+## Deployment
+
+### Docker Compose
+```bash
+docker-compose up -d
+```
+
+### Environment Variables
+- PORT: Server port (default: 8080)
+- DATABASE_URL: PostgreSQL connection string
+- REDIS_HOST: Redis host
+- REDIS_PORT: Redis port
+- JWT_SECRET: JWT signing secret
+- UPLOAD_DIR: File upload directory
