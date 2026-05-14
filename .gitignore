@@ -1,0 +1,15 @@
+.cocoindex_code/
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+node_modules/
+dist/
+build/
+.env
+.env.local
+coverage/
+*.log
+vendor/
