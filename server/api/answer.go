@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/surveyking/surveyking/server/rdbms/impl"
@@ -23,13 +24,13 @@ func (h *AnswerHandler) Submit(c *gin.Context) {
 	projectID := c.Param("projectId")
 	var req dto.SubmitAnswerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid request: %v", err)})
 		return
 	}
 
 	userID := c.GetString("userId")
 	if userID == "" {
-		userID = c.ClientIP()
+		userID = "anonymous"
 	}
 
 	ip := c.ClientIP()
@@ -37,7 +38,7 @@ func (h *AnswerHandler) Submit(c *gin.Context) {
 
 	answer, err := h.service.Submit(projectID, userID, &req, ip, userAgent)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to submit answer"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to submit answer: %v", err)})
 		return
 	}
 
@@ -46,26 +47,32 @@ func (h *AnswerHandler) Submit(c *gin.Context) {
 
 func (h *AnswerHandler) List(c *gin.Context) {
 	projectID := c.Param("projectId")
-	page := 1
-	size := 20
-	if p := c.Query("page"); p != "" {
-		if _, err := fmt.Sscanf(p, "%d", &page); err != nil {
-			page = 1
-		}
-	}
-	if s := c.Query("size"); s != "" {
-		if _, err := fmt.Sscanf(s, "%d", &size); err != nil {
-			size = 20
-		}
-	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
 
 	answers, total, err := h.service.ListByProjectID(projectID, page, size)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list answers"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to list answers: %v", err)})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"items": answers, "total": total, "page": page, "size": size})
+	items := make([]*dto.AnswerDTO, 0, len(answers))
+	for _, a := range answers {
+		items = append(items, &dto.AnswerDTO{
+			ID:        a.ID,
+			ProjectID: a.ProjectID,
+			UserID:    a.UserID,
+			Answers:   a.Answers,
+			Score:     a.Score,
+			TimeSpent: a.TimeSpent,
+			IP:        a.IP,
+			UserAgent: a.UserAgent,
+			Status:    a.Status,
+			CreateTime: a.CreateTime,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"items": items, "total": total, "page": page, "size": size})
 }
 
 func (h *AnswerHandler) Get(c *gin.Context) {
@@ -82,8 +89,53 @@ func (h *AnswerHandler) Statistics(c *gin.Context) {
 	projectID := c.Param("projectId")
 	stats, err := h.service.Statistics(projectID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get statistics"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to get statistics: %v", err)})
 		return
 	}
 	c.JSON(http.StatusOK, stats)
+}
+
+func (h *AnswerHandler) UpdateScore(c *gin.Context) {
+	id := c.Param("id")
+	var req struct {
+		Score int `json:"score" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid request: %v", err)})
+		return
+	}
+
+	if err := h.service.UpdateScore(id, req.Score); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to update score: %v", err)})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Score updated"})
+}
+
+func (h *AnswerHandler) MyAnswers(c *gin.Context) {
+	userID := c.GetString("userId")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
+
+	answers, total, err := h.service.ListByUserID(userID, page, size)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to list answers: %v", err)})
+		return
+	}
+
+	items := make([]*dto.AnswerDTO, 0, len(answers))
+	for _, a := range answers {
+		items = append(items, &dto.AnswerDTO{
+			ID:        a.ID,
+			ProjectID: a.ProjectID,
+			UserID:    a.UserID,
+			Answers:   a.Answers,
+			Score:     a.Score,
+			TimeSpent: a.TimeSpent,
+			Status:    a.Status,
+			CreateTime: a.CreateTime,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"items": items, "total": total, "page": page, "size": size})
 }

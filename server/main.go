@@ -16,17 +16,22 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
+	if err := config.InitDB(); err != nil {
+		log.Fatalf("Failed to init database: %v", err)
+	}
+	defer config.CloseDB()
+
 	r := gin.Default()
 	r.Use(middleware.CORS())
 	r.Use(middleware.Logger())
 
 	jwtMiddleware := middleware.NewJWTMiddleware(config.Get().JWT.Secret)
 
-	userService := impl.NewUserService()
-	projectService := impl.NewProjectService()
-	questionService := impl.NewQuestionService()
-	answerService := impl.NewAnswerService()
-	repoService := impl.NewRepoService()
+	userService := impl.NewUserService(config.GetDB())
+	projectService := impl.NewProjectService(config.GetDB())
+	questionService := impl.NewQuestionService(config.GetDB())
+	answerService := impl.NewAnswerService(config.GetDB())
+	repoService := impl.NewRepoService(config.GetDB())
 
 	userHandler := api.NewUserHandler(userService, jwtMiddleware)
 	projectHandler := api.NewProjectHandler(projectService, jwtMiddleware)
@@ -91,7 +96,10 @@ func main() {
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080"
+		port = config.Get().Server.Port
+		if port == "" {
+			port = "8080"
+		}
 	}
 	log.Printf("Server starting on :%s", port)
 	if err := r.Run(":" + port); err != nil {

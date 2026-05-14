@@ -1,0 +1,14 @@
+.DS_Store
+node_modules
+build
+.env
+.env.local
+*.log
+*.swp
+.vscode
+.idea
+coverage
+dist
+vendor
+*.bak
+__pycache__

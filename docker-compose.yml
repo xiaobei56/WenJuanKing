@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: surveyking
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - DATABASE_URL=host=postgres port=5432 user=postgres password=postgres dbname=surveyking sslmode=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - server
+
+volumes:
+  postgres_data:
+  redis_data:
