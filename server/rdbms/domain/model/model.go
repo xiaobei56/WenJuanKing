@@ -72,3 +72,13 @@ type Repo struct {
 	CreateTime  time.Time `json:"createTime" db:"create_time"`
 	UpdateTime  time.Time `json:"updateTime" db:"update_time"`
 }
+
+type File struct {
+	ID        string    `json:"id" db:"id"`
+	Name      string    `json:"name" db:"name"`
+	Path      string    `json:"path" db:"path"`
+	Size      int64     `json:"size" db:"size"`
+	MimeType  string    `json:"mimeType" db:"mime_type"`
+	UserID    string    `json:"userId" db:"user_id"`
+	CreateTime time.Time `json:"createTime" db:"create_time"`
+}

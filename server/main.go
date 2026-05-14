@@ -34,6 +34,7 @@ func main() {
 	repoService := impl.NewRepoService(config.GetDB())
 	logService := impl.NewLogService(config.GetDB())
 	notificationService := impl.NewNotificationService(config.GetDB())
+	fileService := impl.NewFileService(config.GetDB())
 
 	userHandler := api.NewUserHandler(userService, jwtMiddleware)
 	projectHandler := api.NewProjectHandler(projectService, jwtMiddleware)
@@ -42,7 +43,7 @@ func main() {
 	repoHandler := api.NewRepoHandler(repoService, jwtMiddleware)
 	logHandler := api.NewLogHandler(logService, jwtMiddleware)
 	notificationHandler := api.NewNotificationHandler(notificationService, jwtMiddleware)
-	fileHandler := api.NewFileHandler()
+	fileHandler := api.NewFileHandler(fileService, jwtMiddleware)
 	systemHandler := api.NewSystemHandler(jwtMiddleware)
 
 	// Public routes

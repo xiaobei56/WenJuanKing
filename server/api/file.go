@@ -6,19 +6,26 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/xiaobei56/WenJuanKing/server/rdbms/impl"
+	"github.com/xiaobei56/WenJuanKing/server/shared/core/middleware"
 )
 
-type FileHandler struct{}
+type FileHandler struct {
+	service       *impl.FileService
+	jwtMiddleware *middleware.JWTMiddleware
+}
 
-func NewFileHandler() *FileHandler {
-	return &FileHandler{}
+func NewFileHandler(service *impl.FileService, jwtMiddleware *middleware.JWTMiddleware) *FileHandler {
+	return &FileHandler{service: service, jwtMiddleware: jwtMiddleware}
 }
 
 func (h *FileHandler) Upload(c *gin.Context) {
+	userID := c.GetString("userId")
 	file, err := c.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Failed to upload file: %v", err)})
@@ -45,8 +52,23 @@ func (h *FileHandler) Upload(c *gin.Context) {
 		return
 	}
 
+	mimeType := ""
+	switch ext {
+	case ".jpg", ".jpeg": mimeType = "image/jpeg"
+	case ".png": mimeType = "image/png"
+	case ".gif": mimeType = "image/gif"
+	case ".pdf": mimeType = "application/pdf"
+	}
+
 	url := fmt.Sprintf("/uploads/%s", newFilename)
+	f, err := h.service.Create(file.Filename, url, file.Size, mimeType, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file record"})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
+		"id":       f.ID,
 		"url":      url,
 		"filename": file.Filename,
 		"size":     file.Size,
@@ -54,27 +76,40 @@ func (h *FileHandler) Upload(c *gin.Context) {
 }
 
 func (h *FileHandler) List(c *gin.Context) {
-	_ = c.GetString("userId")
+	userID := c.GetString("userId")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
 
-	var files []gin.H
-	// Simulated file list
-	files = append(files, gin.H{
-		"id":    "1",
-		"name":  "document.pdf",
-		"size":  1024000,
-		"url":   "/uploads/document.pdf",
-		"ctime": time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
-	})
+	files, total, err := h.service.ListByUserID(userID, page, size)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to list files: %v", err)})
+		return
+	}
+
+	items := make([]gin.H, 0, len(files))
+	for _, f := range files {
+		items = append(items, gin.H{
+			"id":       f.ID,
+			"name":     f.Name,
+			"size":     f.Size,
+			"url":      f.Path,
+			"mimeType": f.MimeType,
+			"ctime":    f.CreateTime.Format(time.RFC3339),
+		})
+	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"items": files,
-		"total": len(files),
+		"items": items,
+		"total": total,
 	})
 }
 
 func (h *FileHandler) Delete(c *gin.Context) {
-	_ = c.Param("id")
-	// Simulated delete
+	id := c.Param("id")
+	if err := h.service.Delete(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to delete file: %v", err)})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "File deleted"})
 }
 
