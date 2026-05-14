@@ -179,3 +179,13 @@ func (h *AnswerHandler) MyAnswers(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"items": items, "total": total, "page": page, "size": size})
 }
+
+func (h *AnswerHandler) AutoScore(c *gin.Context) {
+	id := c.Param("id")
+	score, err := h.service.AutoScore(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to auto score: %v", err)})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Auto scoring completed", "score": score})
+}

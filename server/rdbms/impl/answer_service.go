@@ -2,7 +2,9 @@ package impl
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/xiaobei56/WenJuanKing/server/rdbms/domain/model"
@@ -184,4 +186,87 @@ func (s *AnswerService) UpdateScore(id string, score int) error {
 		return fmt.Errorf("answer not found")
 	}
 	return nil
+}
+
+func (s *AnswerService) AutoScore(id string) (int, error) {
+	answer, err := s.GetByID(id)
+	if err != nil {
+		return 0, err
+	}
+
+	var totalScore int
+	type answeredQuestion struct {
+		QuestionID string
+		Value      string
+	}
+	var answered []answeredQuestion
+
+	questions, err := s.ListQuestionsByProjectID(answer.ProjectID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get questions: %w", err)
+	}
+
+	questionMap := make(map[string]*model.Question)
+	for _, q := range questions {
+		questionMap[q.ID] = q
+	}
+
+	totalScore = 0
+	for _, aq := range answered {
+		q, ok := questionMap[aq.QuestionID]
+		if !ok {
+			continue
+		}
+		score := s.calculateQuestionScore(q, aq.Value)
+		totalScore += score
+	}
+
+	if err := s.UpdateScore(id, totalScore); err != nil {
+		return 0, err
+	}
+	return totalScore, nil
+}
+
+func (s *AnswerService) calculateQuestionScore(q *model.Question, answerValue string) int {
+	if q.Type == 1 || q.Type == 2 {
+		var options []map[string]interface{}
+		if err := json.Unmarshal([]byte(q.Options), &options); err != nil {
+			return 0
+		}
+		for _, opt := range options {
+			if opt["value"] == answerValue {
+				if score, ok := opt["score"].(float64); ok {
+					return int(score)
+				}
+			}
+		}
+	}
+	if q.Type == 15 || q.Type == 30 {
+		if score, err := strconv.Atoi(answerValue); err == nil {
+			return score
+		}
+	}
+	return 0
+}
+
+func (s *AnswerService) ListQuestionsByProjectID(projectID string) ([]*model.Question, error) {
+	rows, err := s.db.Query(
+		`SELECT id, project_id, title, type, required, options, validation, logic, settings, order_num, create_time, update_time
+		FROM questions WHERE project_id = $1 ORDER BY order_num`, projectID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query questions: %w", err)
+	}
+	defer rows.Close()
+
+	var questions []*model.Question
+	for rows.Next() {
+		q := &model.Question{}
+		err := rows.Scan(&q.ID, &q.ProjectID, &q.Title, &q.Type, &q.Required, &q.Options, &q.Validation, &q.Logic, &q.Settings, &q.OrderNum, &q.CreateTime, &q.UpdateTime)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan question: %w", err)
+		}
+		questions = append(questions, q)
+	}
+	return questions, nil
 }

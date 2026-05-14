@@ -112,6 +112,7 @@ func main() {
 			answers.GET("/:id", answerHandler.Get)
 			answers.GET("/:id/statistics", answerHandler.Statistics)
 			answers.POST("/:id/score", answerHandler.UpdateScore)
+			answers.POST("/:id/auto-score", answerHandler.AutoScore)
 		}
 
 		// User answers

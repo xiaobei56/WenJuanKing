@@ -34,3 +34,7 @@ type AnswerStatisticsResponse struct {
 	AvgTimeSpent float64               `json:"avgTimeSpent"`
 	ScoreDistribution map[string]int    `json:"scoreDistribution"`
 }
+
+type AutoScoreRequest struct {
+	AnswerID string `json:"answerId" binding:"required"`
+}
