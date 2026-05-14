@@ -3,12 +3,10 @@ package api
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/surveyking/surveyking/server/rdbms/impl"
 	"github.com/surveyking/surveyking/server/shared/core/middleware"
-	"github.com/surveyking/surveyking/server/shared/domain/dto"
 )
 
 type ProjectHandler struct {
@@ -21,14 +19,19 @@ func NewProjectHandler(service *impl.ProjectService, jwtMiddleware *middleware.J
 }
 
 func (h *ProjectHandler) Create(c *gin.Context) {
-	var req dto.CreateProjectRequest
+	var req struct {
+		Name        string `json:"name" binding:"required"`
+		Description string `json:"description"`
+		Type        int    `json:"type" binding:"required"`
+		Settings    string `json:"settings"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid request: %v", err)})
 		return
 	}
 
 	userID := c.GetString("userId")
-	project, err := h.service.Create(userID, &req)
+	project, err := h.service.Create(userID, req.Name, req.Description, req.Type, req.Settings)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create project: %v", err)})
 		return
@@ -38,36 +41,23 @@ func (h *ProjectHandler) Create(c *gin.Context) {
 }
 
 func (h *ProjectHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
+	page := 1
+	size := 20
+	if p := c.Query("page"); p != "" {
+		fmt.Sscanf(p, "%d", &page)
+	}
+	if s := c.Query("size"); s != "" {
+		fmt.Sscanf(s, "%d", &size)
+	}
 
-	req := &dto.ProjectListRequest{Page: page, Size: size}
 	userID := c.GetString("userId")
-
-	projects, total, err := h.service.List(userID, req)
+	projects, total, err := h.service.List(userID, page, size)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to list projects: %v", err)})
 		return
 	}
 
-	items := make([]*dto.ProjectDTO, 0, len(projects))
-	for _, p := range projects {
-		items = append(items, &dto.ProjectDTO{
-			ID:          p.ID,
-			Name:        p.Name,
-			Description: p.Description,
-			Type:        p.Type,
-			Status:      p.Status,
-			UserID:      p.UserID,
-			Settings:    p.Settings,
-			Questions:   p.Questions,
-			PublishTime: p.PublishTime,
-			CreateTime:  p.CreateTime,
-			UpdateTime:  p.UpdateTime,
-		})
-	}
-
-	c.JSON(http.StatusOK, gin.H{"items": items, "total": total, "page": page, "size": size})
+	c.JSON(http.StatusOK, gin.H{"items": projects, "total": total, "page": page, "size": size})
 }
 
 func (h *ProjectHandler) Get(c *gin.Context) {
@@ -82,13 +72,17 @@ func (h *ProjectHandler) Get(c *gin.Context) {
 
 func (h *ProjectHandler) Update(c *gin.Context) {
 	id := c.Param("id")
-	var req dto.UpdateProjectRequest
+	var req struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Settings    string `json:"settings"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid request: %v", err)})
 		return
 	}
 
-	if err := h.service.Update(id, &req); err != nil {
+	if err := h.service.Update(id, req.Name, req.Description, req.Settings); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to update project: %v", err)})
 		return
 	}
@@ -120,6 +114,16 @@ func (h *ProjectHandler) Unpublish(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Project unpublished"})
+}
+
+func (h *ProjectHandler) Duplicate(c *gin.Context) {
+	id := c.Param("id")
+	newProject, err := h.service.Duplicate(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to duplicate project: %v", err)})
+		return
+	}
+	c.JSON(http.StatusCreated, newProject)
 }
 
 func (h *ProjectHandler) UpdateQuestions(c *gin.Context) {

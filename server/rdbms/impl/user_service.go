@@ -7,7 +7,6 @@ import (
 
 	"github.com/surveyking/surveyking/server/rdbms/domain/model"
 	"github.com/surveyking/surveyking/server/shared/core/utils"
-	"github.com/surveyking/surveyking/server/shared/domain/dto"
 )
 
 type UserService struct {
@@ -18,8 +17,8 @@ func NewUserService(db *sql.DB) *UserService {
 	return &UserService{db: db}
 }
 
-func (s *UserService) Create(req *dto.RegisterRequest) (*model.User, error) {
-	hash, err := utils.HashPassword(req.Password)
+func (s *UserService) Create(username, password, email, phone, nickname string) (*model.User, error) {
+	hash, err := utils.HashPassword(password)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
@@ -27,11 +26,11 @@ func (s *UserService) Create(req *dto.RegisterRequest) (*model.User, error) {
 	now := time.Now()
 	user := &model.User{
 		ID:        utils.GenerateUUID(),
-		Username:  req.Username,
+		Username:  username,
 		Password:  hash,
-		Email:     req.Email,
-		Phone:     req.Phone,
-		Nickname:  req.Nickname,
+		Email:     email,
+		Phone:     phone,
+		Nickname:  nickname,
 		Status:    1,
 		CreateTime: now,
 		UpdateTime: now,
@@ -114,10 +113,10 @@ func (s *UserService) List(page, size int) ([]*model.User, int64, error) {
 	return users, total, nil
 }
 
-func (s *UserService) Update(id string, req *dto.UpdateUserRequest) error {
+func (s *UserService) Update(id, nickname, email, phone, avatar string) error {
 	result, err := s.db.Exec(
 		`UPDATE users SET nickname = $1, email = $2, phone = $3, avatar = $4, update_time = $5 WHERE id = $6`,
-		req.Nickname, req.Email, req.Phone, req.Avatar, time.Now(), id,
+		nickname, email, phone, avatar, time.Now(), id,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update user: %w", err)
@@ -165,4 +164,47 @@ func (s *UserService) CheckEmailExists(email string) (bool, error) {
 		return false, fmt.Errorf("failed to check email: %w", err)
 	}
 	return count > 0, nil
+}
+
+func (s *UserService) CheckPassword(password, hash string) bool {
+	return utils.CheckPassword(password, hash)
+}
+
+func (s *UserService) GenerateToken(userID, username string) (string, time.Time, error) {
+	cfg := getJWTConfig()
+	return utils.GenerateToken(userID, username, cfg.Secret, cfg.ExpireHour)
+}
+
+func (s *UserService) ChangePassword(id, oldPassword, newPassword string) error {
+	user, err := s.GetByID(id)
+	if err != nil {
+		return err
+	}
+
+	if !s.CheckPassword(oldPassword, user.Password) {
+		return fmt.Errorf("incorrect old password")
+	}
+
+	hash, err := utils.HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	_, err = s.db.Exec(`UPDATE users SET password = $1, update_time = $2 WHERE id = $3`, hash, time.Now(), id)
+	if err != nil {
+		return fmt.Errorf("failed to update password: %w", err)
+	}
+	return nil
+}
+
+type JWTConfig struct {
+	Secret     string
+	ExpireHour int
+}
+
+func getJWTConfig() JWTConfig {
+	return JWTConfig{
+		Secret:     "your-secret-key-change-in-production",
+		ExpireHour: 72,
+	}
 }

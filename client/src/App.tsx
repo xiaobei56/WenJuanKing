@@ -1,6 +1,16 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { Layout } from 'antd';
+import { Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
+import { Layout, Menu, Dropdown, Avatar, Badge, Space } from 'antd';
+import {
+  HomeOutlined,
+  ProjectOutlined,
+  UserOutlined,
+  SettingOutlined,
+  LogoutOutlined,
+  BellOutlined,
+  DashboardOutlined,
+  AppstoreOutlined,
+} from '@ant-design/icons';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -9,6 +19,10 @@ import ProjectEditPage from './pages/ProjectEditPage';
 import ProjectViewPage from './pages/ProjectViewPage';
 import SurveyPage from './pages/SurveyPage';
 import AnswerSuccessPage from './pages/AnswerSuccessPage';
+import DashboardPage from './pages/DashboardPage';
+import ProfilePage from './pages/ProfilePage';
+import TemplatesPage from './pages/TemplatesPage';
+import SettingsPage from './pages/SettingsPage';
 import { useAuthStore } from './store/auth';
 
 const { Header, Content, Footer } = Layout;
@@ -19,13 +33,85 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 };
 
 const App: React.FC = () => {
+  const navigate = useNavigate();
+  const { user, isAuthenticated, logout } = useAuthStore();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const userMenu = (
+    <Menu>
+      <Menu.Item key="profile" icon={<UserOutlined />} onClick={() => navigate('/profile')}>
+        个人中心
+      </Menu.Item>
+      <Menu.Item key="settings" icon={<SettingOutlined />} onClick={() => navigate('/settings')}>
+        设置
+      </Menu.Item>
+      <Menu.Divider />
+      <Menu.Item key="logout" icon={<LogoutOutlined />} onClick={handleLogout}>
+        退出登录
+      </Menu.Item>
+    </Menu>
+  );
+
+  const headerMenu = (
+    <Menu mode="horizontal" defaultSelectedKeys={['home']}>
+      <Menu.Item key="home" icon={<HomeOutlined />}>
+        <Link to="/">首页</Link>
+      </Menu.Item>
+      {isAuthenticated && (
+        <>
+          <Menu.Item key="dashboard" icon={<DashboardOutlined />}>
+            <Link to="/dashboard">控制台</Link>
+          </Menu.Item>
+          <Menu.Item key="projects" icon={<ProjectOutlined />}>
+            <Link to="/projects">项目管理</Link>
+          </Menu.Item>
+          <Menu.Item key="templates" icon={<AppstoreOutlined />}>
+            <Link to="/templates">模板库</Link>
+          </Menu.Item>
+        </>
+      )}
+    </Menu>
+  );
+
   return (
     <Layout className="layout" style={{ minHeight: '100vh' }}>
-      <Header style={{ display: 'flex', alignItems: 'center' }}>
+      <Header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ color: '#fff', fontSize: 20, fontWeight: 'bold' }}>
-          SurveyKing v2
+          <Link to="/" style={{ color: '#fff' }}>SurveyKing v2</Link>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          {headerMenu}
+
+          {isAuthenticated ? (
+            <Space size="large">
+              <Badge count={0}>
+                <BellOutlined style={{ fontSize: 18, color: '#fff', cursor: 'pointer' }} />
+              </Badge>
+              <Dropdown overlay={userMenu} placement="bottomRight">
+                <Space style={{ cursor: 'pointer' }}>
+                  <Avatar size="small" icon={<UserOutlined />} src={user?.avatar} />
+                  <span style={{ color: '#fff' }}>{user?.nickname || user?.username}</span>
+                </Space>
+              </Dropdown>
+            </Space>
+          ) : (
+            <Space>
+              <Link to="/login">
+                <span style={{ color: '#fff' }}>登录</span>
+              </Link>
+              <Link to="/register">
+                <span style={{ color: '#fff' }}>注册</span>
+              </Link>
+            </Space>
+          )}
         </div>
       </Header>
+
       <Content style={{ padding: '0 50px', flex: 1 }}>
         <div style={{ padding: 24, minHeight: 380 }}>
           <Routes>
@@ -34,6 +120,16 @@ const App: React.FC = () => {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/survey/:id" element={<SurveyPage />} />
             <Route path="/answer/success" element={<AnswerSuccessPage />} />
+
+            {/* Protected Routes */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/projects"
               element={
@@ -66,9 +162,34 @@ const App: React.FC = () => {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <ProfilePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/templates"
+              element={
+                <ProtectedRoute>
+                  <TemplatesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <SettingsPage />
+                </ProtectedRoute>
+              }
+            />
           </Routes>
         </div>
       </Content>
+
       <Footer style={{ textAlign: 'center' }}>
         SurveyKing v2 © 2025 - Built with Go + React + PostgreSQL
       </Footer>

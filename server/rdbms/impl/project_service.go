@@ -7,7 +7,6 @@ import (
 
 	"github.com/surveyking/surveyking/server/rdbms/domain/model"
 	"github.com/surveyking/surveyking/server/shared/core/utils"
-	"github.com/surveyking/surveyking/server/shared/domain/dto"
 )
 
 type ProjectService struct {
@@ -18,20 +17,20 @@ func NewProjectService(db *sql.DB) *ProjectService {
 	return &ProjectService{db: db}
 }
 
-func (s *ProjectService) Create(userID string, req *dto.CreateProjectRequest) (*model.Project, error) {
-	if req.Settings == "" {
-		req.Settings = "{}"
+func (s *ProjectService) Create(userID, name, description string, projectType int, settings string) (*model.Project, error) {
+	if settings == "" {
+		settings = "{}"
 	}
 
 	now := time.Now()
 	project := &model.Project{
 		ID:          utils.GenerateUUID(),
-		Name:        req.Name,
-		Description: req.Description,
-		Type:        req.Type,
+		Name:        name,
+		Description: description,
+		Type:        projectType,
 		Status:      0,
 		UserID:      userID,
-		Settings:    req.Settings,
+		Settings:    settings,
 		CreateTime:  now,
 		UpdateTime:  now,
 	}
@@ -62,39 +61,39 @@ func (s *ProjectService) GetByID(id string) (*model.Project, error) {
 	return project, nil
 }
 
-func (s *ProjectService) List(userID string, req *dto.ProjectListRequest) ([]*model.Project, int64, error) {
-	if req.Page < 1 {
-		req.Page = 1
+func (s *ProjectService) List(userID string, page, size int) ([]*model.Project, int64, error) {
+	if page < 1 {
+		page = 1
 	}
-	if req.Size < 1 || req.Size > 100 {
-		req.Size = 20
+	if size < 1 || size > 100 {
+		size = 20
 	}
-	offset := (req.Page - 1) * req.Size
+	offset := (page - 1) * size
 
 	var total int64
-	var countQuery string
-	var rows *sql.Rows
 	var err error
 
 	if userID != "" {
 		err = s.db.QueryRow(`SELECT COUNT(*) FROM projects WHERE user_id = $1`, userID).Scan(&total)
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to count projects: %w", err)
-		}
+	} else {
+		err = s.db.QueryRow(`SELECT COUNT(*) FROM projects`).Scan(&total)
+	}
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to count projects: %w", err)
+	}
+
+	var rows *sql.Rows
+	if userID != "" {
 		rows, err = s.db.Query(
 			`SELECT id, name, description, type, status, user_id, settings, questions, publish_time, create_time, update_time
 			FROM projects WHERE user_id = $1 ORDER BY create_time DESC LIMIT $2 OFFSET $3`,
-			userID, req.Size, offset,
+			userID, size, offset,
 		)
 	} else {
-		err = s.db.QueryRow(`SELECT COUNT(*) FROM projects`).Scan(&total)
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to count projects: %w", err)
-		}
 		rows, err = s.db.Query(
 			`SELECT id, name, description, type, status, user_id, settings, questions, publish_time, create_time, update_time
 			FROM projects ORDER BY create_time DESC LIMIT $1 OFFSET $2`,
-			req.Size, offset,
+			size, offset,
 		)
 	}
 
@@ -115,10 +114,10 @@ func (s *ProjectService) List(userID string, req *dto.ProjectListRequest) ([]*mo
 	return projects, total, nil
 }
 
-func (s *ProjectService) Update(id string, req *dto.UpdateProjectRequest) error {
+func (s *ProjectService) Update(id, name, description, settings string) error {
 	result, err := s.db.Exec(
 		`UPDATE projects SET name = $1, description = $2, settings = $3, update_time = $4 WHERE id = $5`,
-		req.Name, req.Description, req.Settings, time.Now(), id,
+		name, description, settings, time.Now(), id,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update project: %w", err)
@@ -172,6 +171,36 @@ func (s *ProjectService) Unpublish(id string) error {
 		return fmt.Errorf("project not found")
 	}
 	return nil
+}
+
+func (s *ProjectService) Duplicate(id string) (*model.Project, error) {
+	original, err := s.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	newProject := &model.Project{
+		ID:          utils.GenerateUUID(),
+		Name:        original.Name + " (副本)",
+		Description: original.Description,
+		Type:        original.Type,
+		Status:      0,
+		UserID:      original.UserID,
+		Settings:    original.Settings,
+		CreateTime:  now,
+		UpdateTime:  now,
+	}
+
+	_, err = s.db.Exec(
+		`INSERT INTO projects (id, name, description, type, status, user_id, settings, questions, create_time, update_time)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		newProject.ID, newProject.Name, newProject.Description, newProject.Type, newProject.Status, newProject.UserID, newProject.Settings, "[]", newProject.CreateTime, newProject.UpdateTime,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to duplicate project: %w", err)
+	}
+	return newProject, nil
 }
 
 func (s *ProjectService) UpdateQuestions(id string, questions string) error {
