@@ -12,6 +12,7 @@ type User struct {
 	Email         string    `json:"email" db:"email"`
 	Phone         string    `json:"phone" db:"phone"`
 	Avatar        string    `json:"avatar" db:"avatar"`
+	Role          string    `json:"role" db:"role"`
 	Status        int       `json:"status" db:"status"`
 	CreateTime    time.Time `json:"createTime" db:"create_time"`
 	UpdateTime    time.Time `json:"updateTime" db:"update_time"`

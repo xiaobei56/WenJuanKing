@@ -31,15 +31,16 @@ func (s *UserService) Create(username, password, email, phone, nickname string) 
 		Email:     email,
 		Phone:     phone,
 		Nickname:  nickname,
+		Role:      "user",
 		Status:    1,
 		CreateTime: now,
 		UpdateTime: now,
 	}
 
 	_, err = s.db.Exec(
-		`INSERT INTO users (id, username, password, email, phone, nickname, status, create_time, update_time)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-		user.ID, user.Username, user.Password, user.Email, user.Phone, user.Nickname, user.Status, user.CreateTime, user.UpdateTime,
+		`INSERT INTO users (id, username, password, email, phone, nickname, role, status, create_time, update_time)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		user.ID, user.Username, user.Password, user.Email, user.Phone, user.Nickname, user.Role, user.Status, user.CreateTime, user.UpdateTime,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert user: %w", err)
