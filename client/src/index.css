@@ -49,3 +49,38 @@ code {
   gap: 8px;
   margin-top: 16px;
 }
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+  .ant-layout-header {
+    padding: 0 16px !important;
+  }
+
+  .ant-layout-content {
+    padding: 0 16px !important;
+  }
+
+  .ant-layout-content > div {
+    padding: 16px !important;
+  }
+
+  .ant-col {
+    margin-bottom: 16px;
+  }
+}
+
+@media (max-width: 576px) {
+  .ant-card {
+    margin-bottom: 12px;
+  }
+
+  .ant-card .ant-card-body {
+    padding: 12px;
+  }
+
+  .project-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}

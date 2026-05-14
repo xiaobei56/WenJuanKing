@@ -1,13 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Form, Input, Select, Button, Card, Space, Tabs, Table, Tag, Modal, message, Typography, Divider, Popconfirm } from 'antd';
 import {
-  Card, Form, Input, Select, Button, Space, message, Tabs, Table, Tag, Modal, Typography
-} from 'antd';
-import { SaveOutlined, PlusOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
+  SaveOutlined, PlusOutlined, DeleteOutlined, EditOutlined, EyeOutlined, CopyOutlined,
+  DragOutlined, SettingOutlined, HistoryOutlined
+} from '@ant-design/icons';
+import { useParams, useNavigate } from 'react-router-dom';
 import { projectAPI, questionAPI } from '../services/api';
+import QuestionEditor from '../components/QuestionEditor';
+import { getQuestionComponent } from '../components/QuestionComponents';
 
-const { Title, Paragraph } = Typography;
-const { TabPane } = Tabs;
+const { Title, Text } = Typography;
 const { TextArea } = Input;
 
 interface Question {
@@ -35,13 +37,12 @@ const QUESTION_TYPES = [
   { value: 4, label: '文本域' },
   { value: 5, label: '下拉选择' },
   { value: 6, label: '多选下拉' },
-  { value: 7, label: '级联选择' },
   { value: 8, label: '日期' },
   { value: 9, label: '日期范围' },
-  { value: 10, label: '日期时间' },
   { value: 14, label: '滑块' },
   { value: 15, label: '评分' },
   { value: 16, label: '开关' },
+  { value: 17, label: '文件上传' },
   { value: 26, label: '数字' },
 ];
 
@@ -51,6 +52,56 @@ const PROJECT_TYPES = [
   { value: 3, label: '投票' },
   { value: 4, label: '测评' },
 ];
+
+const QuestionItem: React.FC<{
+  question: Question;
+  index: number;
+  onEdit: () => void;
+  onDelete: () => void;
+}> = ({ question, index, onEdit, onDelete }) => {
+  let options: any[] = [];
+  try {
+    options = question.options ? JSON.parse(question.options) : [];
+  } catch (e) {}
+
+  const QuestionComponent = getQuestionComponent(question.type);
+
+  return (
+    <Card
+      size="small"
+      style={{ marginBottom: 12 }}
+      title={
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <DragOutlined style={{ cursor: 'grab', color: '#999' }} />
+          <span style={{ fontWeight: 'bold' }}>{index + 1}.</span>
+          <span style={{ flex: 1 }}>{question.title}</span>
+          {question.required && <Tag color="red" style={{ margin: 0 }}>必填</Tag>}
+        </div>
+      }
+      extra={
+        <Space>
+          <Button type="text" size="small" icon={<EditOutlined />} onClick={onEdit} />
+          <Popconfirm title="确认删除?" onConfirm={onDelete}>
+            <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+          </Popconfirm>
+        </Space>
+      }
+    >
+      <div style={{ marginBottom: 8 }}>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {QUESTION_TYPES.find(t => t.value === question.type)?.label || '未知'}
+        </Text>
+      </div>
+
+      <QuestionComponent
+        type={question.type}
+        options={options}
+        value={null}
+        onChange={() => {}}
+      />
+    </Card>
+  );
+};
 
 const ProjectEditPage: React.FC = () => {
   const { id } = useParams();
@@ -65,14 +116,6 @@ const ProjectEditPage: React.FC = () => {
 
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [questionModalVisible, setQuestionModalVisible] = useState(false);
-  const [questionForm] = Form.useForm();
-
-  useEffect(() => {
-    if (!isNew && id) {
-      fetchProject(id);
-      fetchQuestions(id);
-    }
-  }, [id]);
 
   const fetchProject = async (projectId: string) => {
     try {
@@ -97,6 +140,13 @@ const ProjectEditPage: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    if (!isNew && id) {
+      fetchProject(id);
+      fetchQuestions(id);
+    }
+  }, [id]);
+
   const handleSaveProject = async () => {
     setLoading(true);
     try {
@@ -112,7 +162,10 @@ const ProjectEditPage: React.FC = () => {
         projectId = res.data.id;
         navigate(`/project/${projectId}`, { replace: true });
       } else {
-        await projectAPI.update(id!, values);
+        await projectAPI.update(id!, {
+          name: values.name,
+          description: values.description,
+        });
       }
       message.success('保存成功');
     } catch (err) {
@@ -122,201 +175,136 @@ const ProjectEditPage: React.FC = () => {
     }
   };
 
-  const handleSaveQuestion = async () => {
-    if (!project && !id) {
-      message.error('请先保存项目');
-      return;
-    }
-
-    const projectId = project?.id || id!;
-    setSaving(true);
-    try {
-      const values = questionForm.getFieldsValue();
-      const questionData = {
-        title: values.title,
-        type: values.type,
-        required: values.required || false,
-        options: JSON.stringify(values.options || []),
-      };
-
-      if (editingQuestion) {
-        await questionAPI.update(projectId, editingQuestion.id, questionData);
-        message.success('更新题目成功');
-      } else {
-        await questionAPI.create(projectId, questionData);
-        message.success('添加题目成功');
-      }
-
-      setQuestionModalVisible(false);
-      questionForm.resetFields();
-      setEditingQuestion(null);
-      fetchQuestions(projectId);
-    } catch (err) {
-      message.error('保存题目失败');
-    } finally {
-      setSaving(false);
+  const handleSaveQuestion = () => {
+    setQuestionModalVisible(false);
+    if (id && id !== 'new') {
+      fetchQuestions(id);
     }
   };
 
   const handleDeleteQuestion = async (questionId: string) => {
-    const projectId = project?.id || id!;
+    if (!id) return;
     try {
-      await questionAPI.delete(projectId, questionId);
+      await questionAPI.delete(id, questionId);
       message.success('删除成功');
-      fetchQuestions(projectId);
+      fetchQuestions(id);
     } catch (err) {
       message.error('删除失败');
     }
   };
 
-  const openQuestionModal = (question?: Question) => {
-    if (question) {
-      setEditingQuestion(question);
-      const options = question.options ? JSON.parse(question.options) : [];
-      questionForm.setFieldsValue({
-        title: question.title,
-        type: question.type,
-        required: question.required,
-        options,
-      });
-    } else {
-      setEditingQuestion(null);
-      questionForm.resetFields();
+  const handlePublish = async () => {
+    if (!id) return;
+    try {
+      await projectAPI.publish(id);
+      message.success('发布成功');
+      fetchProject(id);
+    } catch (err) {
+      message.error('发布失败');
     }
-    setQuestionModalVisible(true);
   };
-
-  const questionColumns = [
-    {
-      title: '序号',
-      dataIndex: 'orderNum',
-      key: 'orderNum',
-      width: 60,
-    },
-    {
-      title: '标题',
-      dataIndex: 'title',
-      key: 'title',
-    },
-    {
-      title: '类型',
-      dataIndex: 'type',
-      key: 'type',
-      render: (type: number) => {
-        const qt = QUESTION_TYPES.find(t => t.value === type);
-        return qt?.label || '未知';
-      },
-    },
-    {
-      title: '必填',
-      dataIndex: 'required',
-      key: 'required',
-      render: (required: boolean) => (
-        <Tag color={required ? 'red' : 'default'}>{required ? '是' : '否'}</Tag>
-      ),
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 150,
-      render: (_: any, record: Question) => (
-        <Space size="small">
-          <Button
-            type="text"
-            icon={<EditOutlined />}
-            onClick={() => openQuestionModal(record)}
-          />
-          <Button
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDeleteQuestion(record.id)}
-          />
-        </Space>
-      ),
-    },
-  ];
 
   return (
     <div>
-      <Space style={{ marginBottom: 16 }}>
-        <Button
-          type="primary"
-          icon={<SaveOutlined />}
-          onClick={handleSaveProject}
-          loading={loading}
-        >
-          保存项目
-        </Button>
-      </Space>
-
-      <Tabs defaultActiveKey="basic">
-        <TabPane tab="基本信息" key="basic">
-          <Card>
-            <Form form={form} layout="vertical">
-              <Form.Item label="项目名称" name="name" rules={[{ required: true }]}>
-                <Input placeholder="请输入项目名称" />
-              </Form.Item>
-              <Form.Item label="项目类型" name="type" rules={[{ required: true }]}>
-                <Select options={PROJECT_TYPES} placeholder="请选择项目类型" />
-              </Form.Item>
-              <Form.Item label="描述" name="description">
-                <TextArea rows={3} placeholder="请输入项目描述" />
-              </Form.Item>
-            </Form>
-          </Card>
-        </TabPane>
-
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+        <Space>
+          <Button
+            type="primary"
+            icon={<SaveOutlined />}
+            onClick={handleSaveProject}
+            loading={loading}
+          >
+            保存项目
+          </Button>
+          {!isNew && project?.status === 0 && (
+            <Button onClick={handlePublish}>发布</Button>
+          )}
+        </Space>
         {!isNew && (
-          <TabPane tab={`题目 (${questions.length})`} key="questions">
-            <Card
-              extra={
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={() => openQuestionModal()}
-                >
-                  添加题目
-                </Button>
-              }
-            >
-              <Table
-                columns={questionColumns}
-                dataSource={questions}
-                rowKey="id"
-                pagination={false}
-              />
-            </Card>
-          </TabPane>
+          <Button icon={<EyeOutlined />} onClick={() => navigate(`/project/${id}/preview`)}>
+            预览
+          </Button>
         )}
-      </Tabs>
+      </div>
+
+      <Tabs
+        items={[
+          {
+            key: 'basic',
+            label: '基本信息',
+            children: (
+              <Card>
+                <Form form={form} layout="vertical">
+                  <Form.Item label="项目名称" name="name" rules={[{ required: true }]}>
+                    <Input placeholder="请输入项目名称" />
+                  </Form.Item>
+                  <Form.Item label="项目类型" name="type" rules={[{ required: true }]}>
+                    <Select options={PROJECT_TYPES} placeholder="请选择项目类型" disabled={!isNew} />
+                  </Form.Item>
+                  <Form.Item label="描述" name="description">
+                    <TextArea rows={3} placeholder="请输入项目描述" />
+                  </Form.Item>
+                </Form>
+              </Card>
+            ),
+          },
+          ...(!isNew ? [{
+            key: 'questions',
+            label: `题目配置 (${questions.length})`,
+            children: (
+              <Card
+                extra={
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={() => {
+                      setEditingQuestion(null);
+                      setQuestionModalVisible(true);
+                    }}
+                  >
+                    添加题目
+                  </Button>
+                }
+              >
+                {questions.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: 40 }}>
+                    <Text type="secondary">暂无题目，点击添加按钮创建题目</Text>
+                  </div>
+                ) : (
+                  questions.map((q, i) => (
+                    <QuestionItem
+                      key={q.id}
+                      question={q}
+                      index={i}
+                      onEdit={() => {
+                        setEditingQuestion(q);
+                        setQuestionModalVisible(true);
+                      }}
+                      onDelete={() => handleDeleteQuestion(q.id)}
+                    />
+                  ))
+                )}
+              </Card>
+            ),
+          }] : []),
+        ]}
+      />
 
       <Modal
         title={editingQuestion ? '编辑题目' : '添加题目'}
         open={questionModalVisible}
-        onOk={handleSaveQuestion}
         onCancel={() => setQuestionModalVisible(false)}
-        confirmLoading={saving}
+        footer={null}
+        width={700}
       >
-        <Form form={questionForm} layout="vertical">
-          <Form.Item label="题目标题" name="title" rules={[{ required: true }]}>
-            <Input placeholder="请输入题目标题" />
-          </Form.Item>
-          <Form.Item label="题目类型" name="type" rules={[{ required: true }]}>
-            <Select options={QUESTION_TYPES} placeholder="请选择题目类型" />
-          </Form.Item>
-          <Form.Item name="required" valuePropName="checked">
-            <label>
-              <input type="checkbox" /> 必填
-            </label>
-          </Form.Item>
-          <Form.Item label="选项（JSON格式）" name="options">
-            <Input.TextArea
-              rows={4}
-              placeholder='例如: [{"label": "选项1", "value": "1"}]'
-            />
-          </Form.Item>
-        </Form>
+        {id && id !== 'new' && (
+          <QuestionEditor
+            projectId={id}
+            question={editingQuestion || undefined}
+            onSave={handleSaveQuestion}
+            onCancel={() => setQuestionModalVisible(false)}
+          />
+        )}
       </Modal>
     </div>
   );
