@@ -54,7 +54,7 @@ func (h *FileHandler) Upload(c *gin.Context) {
 }
 
 func (h *FileHandler) List(c *gin.Context) {
-	userID := c.GetString("userId")
+	_ = c.GetString("userId")
 
 	var files []gin.H
 	// Simulated file list
@@ -73,7 +73,7 @@ func (h *FileHandler) List(c *gin.Context) {
 }
 
 func (h *FileHandler) Delete(c *gin.Context) {
-	id := c.Param("id")
+	_ = c.Param("id")
 	// Simulated delete
 	c.JSON(http.StatusOK, gin.H{"message": "File deleted"})
 }

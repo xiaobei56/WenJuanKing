@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/xiaobei56/WenJuanKing/server/shared/core/utils"
 )
 
@@ -55,8 +56,12 @@ func (s *NotificationService) ListByUserID(userID string, page, size int) ([]gin
 
 	var notifications []gin.H
 	for rows.Next() {
-		n := make(gin.H)
-		rows.Scan(&n["id"], &n["title"], &n["content"], &n["type"], &n["isRead"], &n["createTime"])
+		var id, title, content, nType, isRead, createTime string
+		rows.Scan(&id, &title, &content, &nType, &isRead, &createTime)
+		n := gin.H{
+			"id": id, "title": title, "content": content,
+			"type": nType, "isRead": isRead, "createTime": createTime,
+		}
 		notifications = append(notifications, n)
 	}
 	return notifications, total, nil

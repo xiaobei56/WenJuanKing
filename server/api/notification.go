@@ -1,8 +1,8 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/xiaobei56/WenJuanKing/server/rdbms/impl"
@@ -20,8 +20,8 @@ func NewNotificationHandler(service *impl.NotificationService, jwtMiddleware *mi
 
 func (h *NotificationHandler) List(c *gin.Context) {
 	userID := c.GetString("userId")
-	page, _ := fmt.Atoi(c.DefaultQuery("page", "1"))
-	size, _ := fmt.Atoi(c.DefaultQuery("size", "20"))
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
 
 	notifications, total, err := h.service.ListByUserID(userID, page, size)
 	if err != nil {

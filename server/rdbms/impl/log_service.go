@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/xiaobei56/WenJuanKing/server/shared/core/utils"
 )
 
@@ -59,8 +60,12 @@ func (s *LogService) ListByUserID(userID string, page, size int) ([]gin.H, int64
 
 	var logs []gin.H
 	for rows.Next() {
-		log := make(gin.H)
-		rows.Scan(&log["id"], &log["action"], &log["targetType"], &log["targetId"], &log["details"], &log["ip"], &log["createTime"])
+		var id, action, targetType, targetId, details, ip, createTime string
+		rows.Scan(&id, &action, &targetType, &targetId, &details, &ip, &createTime)
+		log := gin.H{
+			"id": id, "action": action, "targetType": targetType,
+			"targetId": targetId, "details": details, "ip": ip, "createTime": createTime,
+		}
 		logs = append(logs, log)
 	}
 	return logs, total, nil
@@ -96,8 +101,12 @@ func (s *LogService) ListByTarget(targetType, targetID string, page, size int) (
 
 	var logs []gin.H
 	for rows.Next() {
-		log := make(gin.H)
-		rows.Scan(&log["id"], &log["userId"], &log["action"], &log["targetType"], &log["targetId"], &log["details"], &log["ip"], &log["createTime"])
+		var id, userId, action, targetType, targetId, details, ip, createTime string
+		rows.Scan(&id, &userId, &action, &targetType, &targetId, &details, &ip, &createTime)
+		log := gin.H{
+			"id": id, "userId": userId, "action": action, "targetType": targetType,
+			"targetId": targetId, "details": details, "ip": ip, "createTime": createTime,
+		}
 		logs = append(logs, log)
 	}
 	return logs, total, nil

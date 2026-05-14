@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/xiaobei56/WenJuanKing/server/rdbms/domain/model"
 	"github.com/xiaobei56/WenJuanKing/server/rdbms/impl"
 	"github.com/xiaobei56/WenJuanKing/server/shared/core/middleware"
 	"github.com/xiaobei56/WenJuanKing/server/shared/domain/dto"
@@ -118,7 +119,7 @@ func (h *QuestionHandler) BatchCreate(c *gin.Context) {
 		return
 	}
 
-	created := make([]*struct{}, 0)
+	created := make([]*model.Question, 0)
 	for i, q := range req.Questions {
 		q.OrderNum = maxOrder + i + 1
 		question, err := h.service.Create(projectID, &q)
