@@ -91,35 +91,29 @@ func main() {
 			projects.GET("/:id", projectHandler.Get)
 			projects.PUT("/:id", projectHandler.Update)
 			projects.DELETE("/:id", projectHandler.Delete)
+			projects.PUT("/:id/questions", projectHandler.UpdateQuestions)
 			projects.POST("/:id/publish", projectHandler.Publish)
 			projects.POST("/:id/unpublish", projectHandler.Unpublish)
 			projects.POST("/:id/duplicate", projectHandler.Duplicate)
-			projects.POST("/:id/questions", projectHandler.UpdateQuestions)
 		}
 
-		// Questions
-		questions := v1.Group("/projects/:projectId/questions")
-		{
-			questions.POST("", questionHandler.Create)
-			questions.GET("", questionHandler.List)
-			questions.GET("/:id", questionHandler.Get)
-			questions.PUT("/:id", questionHandler.Update)
-			questions.DELETE("/:id", questionHandler.Delete)
-			questions.POST("/sort", questionHandler.Sort)
-			questions.POST("/batch", questionHandler.BatchCreate)
-			questions.GET("/count", questionHandler.Count)
-		}
+		// Questions - nested under projects with path parameter
+		v1.GET("/projects/:id/questions", questionHandler.List)
+		v1.POST("/projects/:id/questions/create", questionHandler.Create)
+		v1.POST("/projects/:id/questions/batch", questionHandler.BatchCreate)
+		v1.GET("/projects/:id/questions/count", questionHandler.Count)
+		v1.GET("/projects/:id/questions/:qid", questionHandler.Get)
+		v1.PUT("/projects/:id/questions/:qid", questionHandler.Update)
+		v1.DELETE("/projects/:id/questions/:qid", questionHandler.Delete)
 
-		// Answers
-		answers := v1.Group("/projects/:projectId/answers")
-		{
-			answers.POST("", answerHandler.Submit)
-			answers.GET("", answerHandler.List)
-			answers.GET("/:id", answerHandler.Get)
-			answers.GET("/:id/statistics", answerHandler.Statistics)
-			answers.POST("/:id/score", answerHandler.UpdateScore)
-			answers.POST("/:id/auto-score", answerHandler.AutoScore)
-		}
+		// Answers - nested under projects
+		v1.POST("/projects/:id/answers", answerHandler.Submit)
+		v1.GET("/projects/:id/answers", answerHandler.List)
+		v1.GET("/projects/:id/answers/:aid", answerHandler.Get)
+		v1.GET("/projects/:id/answers/:aid/statistics", answerHandler.Statistics)
+		v1.POST("/projects/:id/answers/:aid/score", answerHandler.UpdateScore)
+		v1.POST("/projects/:id/answers/:aid/auto-score", answerHandler.AutoScore)
+		v1.GET("/projects/:id/answers/export", answerHandler.Export)
 
 		// User answers
 		v1.GET("/answers", answerHandler.MyAnswers)

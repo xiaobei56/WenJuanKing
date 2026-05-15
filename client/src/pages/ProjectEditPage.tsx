@@ -2,10 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Form, Input, Select, Button, Card, Space, Tabs, Table, Tag, Modal, message, Typography, Divider, Popconfirm } from 'antd';
 import {
   SaveOutlined, PlusOutlined, DeleteOutlined, EditOutlined, EyeOutlined, CopyOutlined,
-  DragOutlined, SettingOutlined, HistoryOutlined, HolderOutlined
+  DragOutlined, SettingOutlined, HistoryOutlined, HolderOutlined, DownloadOutlined
 } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
-import { projectAPI, questionAPI } from '../services/api';
+import { projectAPI, questionAPI, answerAPI } from '../services/api';
 import QuestionEditor from '../components/QuestionEditor';
 import { getQuestionComponent } from '../components/QuestionComponents';
 import {
@@ -166,6 +166,8 @@ const ProjectEditPage: React.FC = () => {
 
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [questionModalVisible, setQuestionModalVisible] = useState(false);
+  const [stats, setStats] = useState<any>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -287,6 +289,49 @@ const ProjectEditPage: React.FC = () => {
     }
   };
 
+  const fetchStatistics = async (projectId: string) => {
+    setStatsLoading(true);
+    try {
+      const res = await answerAPI.statistics(projectId);
+      setStats(res.data);
+    } catch (err) {
+      message.error('获取统计数据失败');
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  const handleExport = async () => {
+    if (!id) return;
+    try {
+      const response = await answerAPI.export(id);
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `answers_${id}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      message.success('导出成功');
+    } catch (err) {
+      message.error('导出失败');
+    }
+  };
+
+  useEffect(() => {
+    if (!isNew && id) {
+      fetchProject(id);
+      fetchQuestions(id);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (!isNew && id) {
+      fetchStatistics(id);
+    }
+  }, [id]);
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -331,56 +376,98 @@ const ProjectEditPage: React.FC = () => {
               </Card>
             ),
           },
-          ...(!isNew ? [{
-            key: 'questions',
-            label: `题目配置 (${questions.length})`,
-            children: (
-              <Card
-                extra={
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    onClick={() => {
-                      setEditingQuestion(null);
-                      setQuestionModalVisible(true);
-                    }}
-                  >
-                    添加题目
-                  </Button>
-                }
-              >
-                {questions.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: 40 }}>
-                    <Text type="secondary">暂无题目，点击添加按钮创建题目</Text>
-                  </div>
-                ) : (
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <SortableContext
-                      items={questions.map(q => q.id)}
-                      strategy={verticalListSortingStrategy}
+          ...(!isNew ? [
+            {
+              key: 'questions',
+              label: `题目配置 (${questions.length})`,
+              children: (
+                <Card
+                  extra={
+                    <Button
+                      type="primary"
+                      icon={<PlusOutlined />}
+                      onClick={() => {
+                        setEditingQuestion(null);
+                        setQuestionModalVisible(true);
+                      }}
                     >
-                      {questions.map((q, i) => (
-                        <SortableQuestionItem
-                          key={q.id}
-                          question={q}
-                          index={i}
-                          onEdit={() => {
-                            setEditingQuestion(q);
-                            setQuestionModalVisible(true);
-                          }}
-                          onDelete={() => handleDeleteQuestion(q.id)}
-                        />
-                      ))}
-                    </SortableContext>
-                  </DndContext>
-                )}
-              </Card>
-            ),
-          }] : []),
+                      添加题目
+                    </Button>
+                  }
+                >
+                  {questions.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: 40 }}>
+                      <Text type="secondary">暂无题目，点击添加按钮创建题目</Text>
+                    </div>
+                  ) : (
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <SortableContext
+                        items={questions.map(q => q.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        {questions.map((q, i) => (
+                          <SortableQuestionItem
+                            key={q.id}
+                            question={q}
+                            index={i}
+                            onEdit={() => {
+                              setEditingQuestion(q);
+                              setQuestionModalVisible(true);
+                            }}
+                            onDelete={() => handleDeleteQuestion(q.id)}
+                          />
+                        ))}
+                      </SortableContext>
+                    </DndContext>
+                  )}
+                </Card>
+              ),
+            },
+            {
+              key: 'statistics',
+              label: '数据统计',
+              children: (
+                <Card
+                  extra={
+                    <Button icon={<DownloadOutlined />} onClick={handleExport}>
+                      导出CSV
+                    </Button>
+                  }
+                >
+                  {statsLoading ? (
+                    <div style={{ textAlign: 'center', padding: 40 }}>加载中...</div>
+                  ) : stats ? (
+                    <Space size="large" style={{ marginBottom: 24 }}>
+                      <Card size="small">
+                        <Text type="secondary">总答卷</Text>
+                        <div style={{ fontSize: 24, fontWeight: 'bold' }}>{stats.total || 0}</div>
+                      </Card>
+                      <Card size="small">
+                        <Text type="secondary">已完成</Text>
+                        <div style={{ fontSize: 24, fontWeight: 'bold', color: '#52c41a' }}>{stats.completed || 0}</div>
+                      </Card>
+                      <Card size="small">
+                        <Text type="secondary">已放弃</Text>
+                        <div style={{ fontSize: 24, fontWeight: 'bold', color: '#ff4d4f' }}>{(stats.total || 0) - (stats.completed || 0)}</div>
+                      </Card>
+                      <Card size="small">
+                        <Text type="secondary">平均用时</Text>
+                        <div style={{ fontSize: 24, fontWeight: 'bold' }}>{stats.avgTimeSpent ? `${Math.round(stats.avgTimeSpent / 60)}分钟` : '-'}</div>
+                      </Card>
+                    </Space>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: 40 }}>
+                      <Text type="secondary">暂无答卷数据</Text>
+                    </div>
+                  )}
+                </Card>
+              ),
+            },
+          ] : []),
         ]}
       />
 

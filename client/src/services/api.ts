@@ -145,6 +145,11 @@ export const answerAPI = {
 
   updateScore: (projectId: string, answerId: string, score: number) =>
     api.post(`/v1/projects/${projectId}/answers/${answerId}/score`, { score }),
+
+  export: (projectId: string) =>
+    api.get(`/v1/projects/${projectId}/answers/export`, {
+      responseType: 'blob',
+    }),
 };
 
 export const repoAPI = {
