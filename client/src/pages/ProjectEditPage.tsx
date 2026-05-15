@@ -2,12 +2,29 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Form, Input, Select, Button, Card, Space, Tabs, Table, Tag, Modal, message, Typography, Divider, Popconfirm } from 'antd';
 import {
   SaveOutlined, PlusOutlined, DeleteOutlined, EditOutlined, EyeOutlined, CopyOutlined,
-  DragOutlined, SettingOutlined, HistoryOutlined
+  DragOutlined, SettingOutlined, HistoryOutlined, HolderOutlined
 } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { projectAPI, questionAPI } from '../services/api';
 import QuestionEditor from '../components/QuestionEditor';
 import { getQuestionComponent } from '../components/QuestionComponents';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -20,6 +37,9 @@ interface Question {
   required: boolean;
   options: string;
   orderNum: number;
+  validation?: string;
+  logic?: string;
+  settings?: string;
 }
 
 interface Project {
@@ -53,12 +73,35 @@ const PROJECT_TYPES = [
   { value: 4, label: '测评' },
 ];
 
-const QuestionItem: React.FC<{
+interface SortableQuestionItemProps {
   question: Question;
   index: number;
   onEdit: () => void;
   onDelete: () => void;
-}> = ({ question, index, onEdit, onDelete }) => {
+}
+
+const SortableQuestionItem: React.FC<SortableQuestionItemProps> = ({
+  question,
+  index,
+  onEdit,
+  onDelete,
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: question.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 1000 : 'auto',
+  };
+
   let options: any[] = [];
   try {
     options = question.options ? JSON.parse(question.options) : [];
@@ -67,39 +110,46 @@ const QuestionItem: React.FC<{
   const QuestionComponent = getQuestionComponent(question.type);
 
   return (
-    <Card
-      size="small"
-      style={{ marginBottom: 12 }}
-      title={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <DragOutlined style={{ cursor: 'grab', color: '#999' }} />
-          <span style={{ fontWeight: 'bold' }}>{index + 1}.</span>
-          <span style={{ flex: 1 }}>{question.title}</span>
-          {question.required && <Tag color="red" style={{ margin: 0 }}>必填</Tag>}
+    <div ref={setNodeRef} style={style} {...attributes}>
+      <Card
+        size="small"
+        style={{ marginBottom: 12, border: isDragging ? '2px solid #1890ff' : undefined }}
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span
+              {...listeners}
+              style={{ cursor: 'grab', display: 'flex', alignItems: 'center' }}
+            >
+              <HolderOutlined style={{ color: '#999', fontSize: 16 }} />
+            </span>
+            <span style={{ fontWeight: 'bold', minWidth: 24 }}>{index + 1}.</span>
+            <span style={{ flex: 1 }}>{question.title}</span>
+            {question.required && <Tag color="red" style={{ margin: 0 }}>必填</Tag>}
+          </div>
+        }
+        extra={
+          <Space>
+            <Button type="text" size="small" icon={<EditOutlined />} onClick={onEdit} />
+            <Popconfirm title="确认删除?" onConfirm={onDelete}>
+              <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+            </Popconfirm>
+          </Space>
+        }
+      >
+        <div style={{ marginBottom: 8 }}>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {QUESTION_TYPES.find(t => t.value === question.type)?.label || '未知'}
+          </Text>
         </div>
-      }
-      extra={
-        <Space>
-          <Button type="text" size="small" icon={<EditOutlined />} onClick={onEdit} />
-          <Popconfirm title="确认删除?" onConfirm={onDelete}>
-            <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
-        </Space>
-      }
-    >
-      <div style={{ marginBottom: 8 }}>
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          {QUESTION_TYPES.find(t => t.value === question.type)?.label || '未知'}
-        </Text>
-      </div>
 
-      <QuestionComponent
-        type={question.type}
-        options={options}
-        value={null}
-        onChange={() => {}}
-      />
-    </Card>
+        <QuestionComponent
+          type={question.type}
+          options={options}
+          value={null}
+          onChange={() => {}}
+        />
+      </Card>
+    </div>
   );
 };
 
@@ -116,6 +166,39 @@ const ProjectEditPage: React.FC = () => {
 
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [questionModalVisible, setQuestionModalVisible] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id && id && id !== 'new') {
+      const oldIndex = questions.findIndex((q) => q.id === active.id);
+      const newIndex = questions.findIndex((q) => q.id === over.id);
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newQuestions = arrayMove(questions, oldIndex, newIndex);
+        setQuestions(newQuestions);
+
+        try {
+          await questionAPI.sort(id, newQuestions.map((q) => q.id));
+          message.success('题目顺序已保存');
+        } catch (err) {
+          message.error('保存顺序失败');
+          fetchQuestions(id);
+        }
+      }
+    }
+  }, [questions, id]);
 
   const fetchProject = async (projectId: string) => {
     try {
@@ -271,18 +354,29 @@ const ProjectEditPage: React.FC = () => {
                     <Text type="secondary">暂无题目，点击添加按钮创建题目</Text>
                   </div>
                 ) : (
-                  questions.map((q, i) => (
-                    <QuestionItem
-                      key={q.id}
-                      question={q}
-                      index={i}
-                      onEdit={() => {
-                        setEditingQuestion(q);
-                        setQuestionModalVisible(true);
-                      }}
-                      onDelete={() => handleDeleteQuestion(q.id)}
-                    />
-                  ))
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext
+                      items={questions.map(q => q.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {questions.map((q, i) => (
+                        <SortableQuestionItem
+                          key={q.id}
+                          question={q}
+                          index={i}
+                          onEdit={() => {
+                            setEditingQuestion(q);
+                            setQuestionModalVisible(true);
+                          }}
+                          onDelete={() => handleDeleteQuestion(q.id)}
+                        />
+                      ))}
+                    </SortableContext>
+                  </DndContext>
                 )}
               </Card>
             ),
