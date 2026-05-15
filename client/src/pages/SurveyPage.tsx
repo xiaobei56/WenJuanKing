@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { Card, Typography, Spin, message, Button } from 'antd';
+import { Card, Typography, Spin, message, Button, Progress } from 'antd';
 import { projectAPI, questionAPI, answerAPI } from '../services/api';
 
 const { Title, Text } = Typography;
@@ -18,6 +18,8 @@ interface Project {
   name: string;
   description: string;
   status: number;
+  type?: number;
+  settings?: string;
 }
 
 const SurveyPage: React.FC = () => {
@@ -28,12 +30,37 @@ const SurveyPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
+  const [timeLeft, setTimeLeft] = useState<number>(0);
+  const [examDuration, setExamDuration] = useState<number>(0);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const startTimeRef = useRef<number>(0);
 
   useEffect(() => {
     if (id) {
       fetchData(id);
     }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [id]);
+
+  useEffect(() => {
+    if (examDuration > 0 && timeLeft > 0) {
+      timerRef.current = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            clearInterval(timerRef.current!);
+            handleTimeUp();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [examDuration]);
 
   const fetchData = async (projectId: string) => {
     setLoading(true);
@@ -45,6 +72,20 @@ const SurveyPage: React.FC = () => {
       }
       setProject(projectRes.data);
 
+      let duration = 0;
+      if (projectRes.data.type === 2 && projectRes.data.settings) {
+        try {
+          const settings = JSON.parse(projectRes.data.settings);
+          duration = settings.examDuration || 0;
+        } catch (e) {}
+      }
+
+      if (duration > 0) {
+        setExamDuration(duration * 60);
+        setTimeLeft(duration * 60);
+        startTimeRef.current = Date.now();
+      }
+
       const questionsRes = await questionAPI.list(projectId);
       setQuestions(questionsRes.data || []);
     } catch (err) {
@@ -52,6 +93,25 @@ const SurveyPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleTimeUp = async () => {
+    if (!id) return;
+    message.warning('时间到，自动提交');
+    try {
+      await answerAPI.submit(id, {
+        answers: JSON.stringify(answers),
+      });
+      window.location.href = '/answer/success';
+    } catch (err) {
+      message.error('提交失败');
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   const handleSubmit = async () => {
@@ -193,6 +253,26 @@ const SurveyPage: React.FC = () => {
             {questions.length} 道题 | 第 {currentIndex + 1} / {questions.length}
           </Text>
         </div>
+        {examDuration > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+              <Text type="secondary">剩余时间:</Text>
+              <span style={{
+                fontSize: 24,
+                fontWeight: 'bold',
+                color: timeLeft <= 60 ? '#ff4d4f' : '#1890ff',
+              }}>
+                {formatTime(timeLeft)}
+              </span>
+            </div>
+            <Progress
+              percent={Math.round((timeLeft / examDuration) * 100)}
+              showInfo={false}
+              strokeColor={timeLeft <= 60 ? '#ff4d4f' : '#1890ff'}
+              style={{ marginTop: 8 }}
+            />
+          </div>
+        )}
       </Card>
 
       {questions.length > 0 ? (
