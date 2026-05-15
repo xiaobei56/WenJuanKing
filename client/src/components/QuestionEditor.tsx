@@ -34,6 +34,7 @@ interface QuestionEditorProps {
     settings?: string;
   };
   questions?: { id: string; title: string }[];
+  initialType?: number;
   onSave: () => void;
   onCancel: () => void;
 }
@@ -78,6 +79,7 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
   projectId,
   question,
   questions = [],
+  initialType,
   onSave,
   onCancel,
 }) => {
@@ -103,10 +105,14 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
       } catch (e) {}
     } else {
       form.resetFields();
+      form.setFieldsValue({
+        type: initialType || 1,
+        required: false,
+      });
       setOptions([]);
       setLogicRules([]);
     }
-  }, [question, form]);
+  }, [question, form, initialType]);
 
   const handleAddOption = () => {
     const newOption: Option = {

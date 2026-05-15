@@ -7,6 +7,7 @@ import {
 import { useParams, useNavigate } from 'react-router-dom';
 import { projectAPI, questionAPI, answerAPI } from '../services/api';
 import QuestionEditor from '../components/QuestionEditor';
+import QuestionTypePicker from '../components/QuestionTypePicker';
 import { getQuestionComponent } from '../components/QuestionComponents';
 import {
   DndContext,
@@ -166,6 +167,8 @@ const ProjectEditPage: React.FC = () => {
 
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [questionModalVisible, setQuestionModalVisible] = useState(false);
+  const [typePickerVisible, setTypePickerVisible] = useState(false);
+  const [selectedQuestionType, setSelectedQuestionType] = useState<number | null>(null);
   const [stats, setStats] = useState<any>(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [examDuration, setExamDuration] = useState<number>(0);
@@ -413,12 +416,13 @@ const ProjectEditPage: React.FC = () => {
                       type="primary"
                       icon={<PlusOutlined />}
                       onClick={() => {
-                        setEditingQuestion(null);
-                        setQuestionModalVisible(true);
-                      }}
-                    >
-                      添加题目
-                    </Button>
+setEditingQuestion(null);
+                      setSelectedQuestionType(null);
+                      setTypePickerVisible(true);
+                    }}
+                  >
+                    添加题目
+                  </Button>
                   }
                 >
                   {questions.length === 0 ? (
@@ -509,11 +513,26 @@ const ProjectEditPage: React.FC = () => {
             projectId={id}
             question={editingQuestion || undefined}
             questions={questions}
+            initialType={selectedQuestionType || undefined}
             onSave={handleSaveQuestion}
-            onCancel={() => setQuestionModalVisible(false)}
+            onCancel={() => {
+              setQuestionModalVisible(false);
+              setSelectedQuestionType(null);
+            }}
           />
         )}
       </Modal>
+
+      <QuestionTypePicker
+        open={typePickerVisible}
+        onSelect={(type) => {
+          setTypePickerVisible(false);
+          setSelectedQuestionType(type);
+          setEditingQuestion(null);
+          setQuestionModalVisible(true);
+        }}
+        onCancel={() => setTypePickerVisible(false)}
+      />
     </div>
   );
 };
