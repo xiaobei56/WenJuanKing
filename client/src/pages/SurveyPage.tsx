@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { Card, Typography, Spin, message, Button, Progress } from 'antd';
 import { projectAPI, questionAPI, answerAPI } from '../services/api';
+import { getVisibleQuestions, parseLogic, evaluateQuestionLogic, Question as LogicQuestion } from '../utils/logicEngine';
 
 const { Title, Text } = Typography;
 
@@ -11,6 +12,7 @@ interface Question {
   type: number;
   required: boolean;
   options: string;
+  logic?: string;
 }
 
 interface Project {
@@ -32,6 +34,7 @@ const SurveyPage: React.FC = () => {
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [examDuration, setExamDuration] = useState<number>(0);
+  const [hiddenQuestionIds, setHiddenQuestionIds] = useState<Set<string>>(new Set());
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
 
@@ -132,11 +135,25 @@ const SurveyPage: React.FC = () => {
   };
 
   const handleAnswerChange = (questionId: string, value: any) => {
-    setAnswers(prev => ({
-      ...prev,
+    const newAnswers = {
+      ...answers,
       [questionId]: value,
-    }));
+    };
+    setAnswers(newAnswers);
+
+    const newHiddenIds = new Set<string>();
+    for (const q of questions) {
+      const { hidden } = evaluateQuestionLogic(q, newAnswers);
+      if (hidden) {
+        newHiddenIds.add(q.id);
+      }
+    }
+    setHiddenQuestionIds(newHiddenIds);
   };
+
+  const visibleQuestions = questions.filter(q => !hiddenQuestionIds.has(q.id));
+  const displayQuestions = visibleQuestions; // alias for clarity
+  const currentQuestion = displayQuestions[currentIndex];
 
   const renderQuestion = (q: Question, index: number) => {
     let options: any[] = [];
@@ -250,7 +267,7 @@ const SurveyPage: React.FC = () => {
         <Text type="secondary">{project.description}</Text>
         <div style={{ marginTop: 8 }}>
           <Text type="secondary">
-            {questions.length} 道题 | 第 {currentIndex + 1} / {questions.length}
+            {displayQuestions.length} 道题 | 第 {currentIndex + 1} / {displayQuestions.length}
           </Text>
         </div>
         {examDuration > 0 && (
@@ -275,9 +292,9 @@ const SurveyPage: React.FC = () => {
         )}
       </Card>
 
-      {questions.length > 0 ? (
+      {displayQuestions.length > 0 ? (
         <>
-          {questions[currentIndex] && renderQuestion(questions[currentIndex], currentIndex)}
+          {currentQuestion && renderQuestion(currentQuestion, currentIndex)}
 
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24 }}>
             <Button
@@ -287,7 +304,7 @@ const SurveyPage: React.FC = () => {
               上一题
             </Button>
 
-            {currentIndex === questions.length - 1 ? (
+            {currentIndex === displayQuestions.length - 1 ? (
               <Button
                 type="primary"
                 onClick={handleSubmit}
@@ -298,7 +315,13 @@ const SurveyPage: React.FC = () => {
             ) : (
               <Button
                 type="primary"
-                onClick={() => setCurrentIndex(prev => prev + 1)}
+                onClick={() => {
+                  let nextIdx = currentIndex + 1;
+                  while (nextIdx < displayQuestions.length && hiddenQuestionIds.has(displayQuestions[nextIdx].id)) {
+                    nextIdx++;
+                  }
+                  setCurrentIndex(nextIdx);
+                }}
               >
                 下一题
               </Button>
