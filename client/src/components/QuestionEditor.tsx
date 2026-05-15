@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Form, Input, Upload, Select, Button, Space, Card, Typography, Modal, message } from 'antd';
+const { Text } = Typography;
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { questionAPI } from '../services/api';
 
@@ -28,10 +29,11 @@ interface QuestionEditorProps {
     type: number;
     required: boolean;
     options: string;
-    validation: string;
-    logic: string;
-    settings: string;
+    validation?: string;
+    logic?: string;
+    settings?: string;
   };
+  questions?: { id: string; title: string }[];
   onSave: () => void;
   onCancel: () => void;
 }
@@ -75,6 +77,7 @@ const QUESTION_TYPES = [
 export const QuestionEditor: React.FC<QuestionEditorProps> = ({
   projectId,
   question,
+  questions = [],
   onSave,
   onCancel,
 }) => {
@@ -275,11 +278,21 @@ export const QuestionEditor: React.FC<QuestionEditorProps> = ({
                   { value: 'show', label: '显示' },
                 ]}
               />
-              <Input
-                placeholder="目标题目ID"
+              <Select
+                placeholder="选择题目"
                 value={rule.targetQuestionId}
-                onChange={(e) => handleUpdateLogic(index, 'targetQuestionId', e.target.value)}
-              />
+                onChange={(val) => handleUpdateLogic(index, 'targetQuestionId', val)}
+                style={{ flex: 1 }}
+                allowClear
+              >
+                {questions
+                  .filter((q) => q.id !== question?.id)
+                  .map((q) => (
+                    <Select.Option key={q.id} value={q.id}>
+                      {q.title}
+                    </Select.Option>
+                  ))}
+              </Select>
               <Button
                 type="text"
                 danger

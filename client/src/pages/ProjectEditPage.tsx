@@ -395,6 +395,7 @@ const ProjectEditPage: React.FC = () => {
           <QuestionEditor
             projectId={id}
             question={editingQuestion || undefined}
+            questions={questions}
             onSave={handleSaveQuestion}
             onCancel={() => setQuestionModalVisible(false)}
           />
