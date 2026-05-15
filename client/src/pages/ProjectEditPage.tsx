@@ -168,6 +168,7 @@ const ProjectEditPage: React.FC = () => {
   const [questionModalVisible, setQuestionModalVisible] = useState(false);
   const [stats, setStats] = useState<any>(null);
   const [statsLoading, setStatsLoading] = useState(false);
+  const [examDuration, setExamDuration] = useState<number>(0);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -206,6 +207,14 @@ const ProjectEditPage: React.FC = () => {
     try {
       const res = await projectAPI.get(projectId);
       setProject(res.data);
+      let duration = 0;
+      if (res.data.settings) {
+        try {
+          const settings = JSON.parse(res.data.settings);
+          duration = settings.examDuration || 0;
+        } catch (e) {}
+      }
+      setExamDuration(duration);
       form.setFieldsValue({
         name: res.data.name,
         description: res.data.description,
@@ -237,12 +246,18 @@ const ProjectEditPage: React.FC = () => {
     try {
       const values = form.getFieldsValue();
       let projectId = id;
+      const settings: Record<string, any> = {};
+      if (values.type === 2 && examDuration > 0) {
+        settings.examDuration = examDuration;
+      }
+      const settingsStr = Object.keys(settings).length > 0 ? JSON.stringify(settings) : undefined;
 
       if (isNew) {
         const res = await projectAPI.create({
           name: values.name,
           description: values.description,
           type: values.type,
+          settings: settingsStr,
         });
         projectId = res.data.id;
         navigate(`/project/${projectId}`, { replace: true });
@@ -250,6 +265,7 @@ const ProjectEditPage: React.FC = () => {
         await projectAPI.update(id!, {
           name: values.name,
           description: values.description,
+          settings: settingsStr,
         });
       }
       message.success('保存成功');
@@ -372,6 +388,16 @@ const ProjectEditPage: React.FC = () => {
                   <Form.Item label="描述" name="description">
                     <TextArea rows={3} placeholder="请输入项目描述" />
                   </Form.Item>
+                  {project?.type === 2 && (
+                    <Form.Item label="考试时长（分钟）">
+                      <Input
+                        type="number"
+                        value={examDuration}
+                        onChange={(e) => setExamDuration(parseInt(e.target.value) || 0)}
+                        placeholder="0表示不限时"
+                      />
+                    </Form.Item>
+                  )}
                 </Form>
               </Card>
             ),
